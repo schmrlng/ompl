@@ -130,23 +130,6 @@ namespace ompl
                 return radiusMultiplier_;
             }
 
-            /** \brief Store the volume of the obstacle-free configuration space.
-                If no value is specified, the default assumes an obstacle-free
-                unit hypercube, freeSpaceVolume = (maximumExtent/sqrt(dimension))^(dimension) */
-            void setFreeSpaceVolume(const double freeSpaceVolume)
-            {
-                if (freeSpaceVolume < 0.0)
-                    throw Exception("Free space volume should be greater than zero");
-                freeSpaceVolume_ = freeSpaceVolume;
-            }
-
-            /** \brief Get the volume of the free configuration space that is
-                being used by the planner */
-            double getFreeSpaceVolume() const
-            {
-                return freeSpaceVolume_;
-            }
-
         protected:
             /** \brief Representation of a motion
               */

@@ -41,6 +41,7 @@
 #include <iostream>
 
 #include <boost/math/constants/constants.hpp>
+#include <boost/math/distributions/binomial.hpp>
 
 #include <ompl/datastructures/BinaryHeap.h>
 #include <ompl/tools/config/SelfConfig.h>
@@ -53,7 +54,8 @@ ompl::geometric::FMT::FMT(const base::SpaceInformationPtr &si)
     , numSamples_(1000)
     , radiusMultiplier_(1.1)
 {
-    freeSpaceVolume_ = std::pow(si_->getMaximumExtent() / std::sqrt(si_->getStateDimension()), si_->getStateDimension());
+    // An upper bound on the free space volume is the total space volume; the free fraction is estimated in sampleFree
+    freeSpaceVolume_ = si->getMeasure();
     lastGoalMotion_ = NULL;
 
     specs_.approximateSolutions = false;
@@ -61,7 +63,6 @@ ompl::geometric::FMT::FMT(const base::SpaceInformationPtr &si)
 
     ompl::base::Planner::declareParam<unsigned int>("num_samples", this, &FMT::setNumSamples, &FMT::getNumSamples, "10:10:10000");
     ompl::base::Planner::declareParam<double>("radius_multiplier", this, &FMT::setRadiusMultiplier, &FMT::getRadiusMultiplier, "0.9:0.05:5.");
-    ompl::base::Planner::declareParam<double>("free_space_volume", this, &FMT::setFreeSpaceVolume, &FMT::getFreeSpaceVolume, "1.:10:1000000.");
 }
 
 ompl::geometric::FMT::~FMT()
@@ -181,12 +182,14 @@ double ompl::geometric::FMT::calculateRadius(const unsigned int dimension, const
 void ompl::geometric::FMT::sampleFree(const base::PlannerTerminationCondition &ptc)
 {
     unsigned int nodeCount = 0;
+    unsigned int sampleAttempts = 0;
     Motion *motion = new Motion(si_);
 
     // Sample numSamples_ number of nodes from the free configuration space
     while (nodeCount < numSamples_ && !ptc)
     {
         sampler_->sampleUniform(motion->getState());
+        sampleAttempts++;
 
         bool collision_free = si_->isValid(motion->getState());
 
@@ -199,6 +202,9 @@ void ompl::geometric::FMT::sampleFree(const base::PlannerTerminationCondition &p
     } // While nodeCount < numSamples
     si_->freeState(motion->getState());
     delete motion;
+
+    // 95% confidence limit for an upper bound for the true free space volume
+    freeSpaceVolume_ = boost::math::binomial_distribution<>::find_upper_bound_on_p(sampleAttempts, nodeCount, 0.05) * si->getMeasure();
 }
 
 void ompl::geometric::FMT::assureGoalIsSampled(const ompl::base::GoalSampleableRegion *goal)
